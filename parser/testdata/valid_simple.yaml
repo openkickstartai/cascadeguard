@@ -1,0 +1,20 @@
+# Simple two-service topology: gateway -> user-svc
+services:
+  - name: gateway
+    endpoints:
+      - method: GET
+        path: /users
+        idempotent: true
+    dependencies:
+      - target: user-svc
+        timeout: 3s
+        max_retries: 2
+        backoff_base: 100ms
+        backoff_jitter_enabled: true
+        circuit_breaker_enabled: true
+
+  - name: user-svc
+    endpoints:
+      - method: GET
+        path: /internal/users
+        idempotent: true

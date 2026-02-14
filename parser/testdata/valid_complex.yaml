@@ -1,0 +1,70 @@
+# Multi-tier topology: gateway -> order-svc -> inventory-svc -> db-svc
+#                                order-svc -> payment-svc
+services:
+  - name: api-gateway
+    endpoints:
+      - method: GET
+        path: /orders
+        idempotent: true
+      - method: POST
+        path: /orders
+        idempotent: false
+    dependencies:
+      - target: order-svc
+        timeout: 5s
+        max_retries: 3
+        backoff_base: 200ms
+        backoff_jitter_enabled: true
+        circuit_breaker_enabled: true
+
+  - name: order-svc
+    endpoints:
+      - method: GET
+        path: /internal/orders
+        idempotent: true
+      - method: POST
+        path: /internal/orders
+        idempotent: false
+    dependencies:
+      - target: inventory-svc
+        timeout: 3s
+        max_retries: 2
+        backoff_base: 100ms
+        backoff_jitter_enabled: true
+        circuit_breaker_enabled: true
+      - target: payment-svc
+        timeout: 4s
+        max_retries: 1
+        backoff_base: 500ms
+        backoff_jitter_enabled: true
+        circuit_breaker_enabled: true
+
+  - name: inventory-svc
+    endpoints:
+      - method: GET
+        path: /stock
+        idempotent: true
+      - method: PATCH
+        path: /stock/reserve
+        idempotent: false
+    dependencies:
+      - target: db-svc
+        timeout: 1s
+        max_retries: 1
+        backoff_base: 50ms
+        backoff_jitter_enabled: false
+        circuit_breaker_enabled: false
+
+  - name: payment-svc
+    endpoints:
+      - method: POST
+        path: /charge
+        idempotent: false
+    dependencies: []
+
+  - name: db-svc
+    endpoints:
+      - method: GET
+        path: /query
+        idempotent: true
+    dependencies: []

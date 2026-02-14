@@ -1,0 +1,8 @@
+# Minimal valid topology: single service with no dependencies
+services:
+  - name: standalone-svc
+    endpoints:
+      - method: GET
+        path: /health
+        idempotent: true
+    dependencies: []
