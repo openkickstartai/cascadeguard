@@ -39,7 +39,19 @@ func main() {
 	var edges []CallEdge
 	for svc, sc := range cfg.Services {
 		for _, c := range sc.Calls {
-			t, _ := time.ParseDuration(c.Timeout)
+			var t time.Duration
+			if c.Timeout != "" {
+				var err error
+				t, err = time.ParseDuration(c.Timeout)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "error: %s->%s invalid timeout %q: %v\n", svc, c.Target, c.Timeout, err)
+					os.Exit(2)
+				}
+			}
+			if c.Retries < 0 {
+				fmt.Fprintf(os.Stderr, "error: %s->%s retries must be non-negative\n", svc, c.Target)
+				os.Exit(2)
+			}
 			m := c.Method
 			if m == "" {
 				m = "GET"

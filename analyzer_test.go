@@ -81,3 +81,34 @@ func TestCleanTopology(t *testing.T) {
 		t.Fatalf("expected 0 findings, got %d", len(findings))
 	}
 }
+
+func TestCyclicTopologyNoPanic(t *testing.T) {
+	g := NewGraph([]CallEdge{
+		edge("gateway", "A", 3*time.Second, 2, true, "GET", true),
+		edge("A", "B", 3*time.Second, 2, true, "GET", true),
+		edge("B", "A", 3*time.Second, 2, true, "GET", true),
+	})
+	findings := g.Analyze()
+	for _, f := range findings {
+		if f.Rule == "retry-amplification" {
+			seen := map[string]bool{}
+			for _, n := range f.Path {
+				if seen[n] {
+					t.Fatalf("cycle detected in finding path: %v", f.Path)
+				}
+				seen[n] = true
+			}
+		}
+	}
+}
+
+func TestZeroTimeoutSkipsInversion(t *testing.T) {
+	g := NewGraph([]CallEdge{
+		edge("A", "B", 0, 0, true, "GET", true),
+		edge("B", "C", 5*time.Second, 0, true, "GET", true),
+	})
+	findings := g.Analyze()
+	if hasRule(findings, "timeout-inversion") {
+		t.Fatal("should not flag timeout-inversion when upstream timeout is 0 (unset)")
+	}
+}
