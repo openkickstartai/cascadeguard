@@ -1,0 +1,7 @@
+services:
+  - name: standalone-svc
+    endpoints:
+      - method: GET
+        path: /health
+        idempotent: true
+    dependencies: []
