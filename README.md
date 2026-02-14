@@ -1,2 +1,67 @@
-# cascadeguard
-每一次微服务大规模故障的事后复盘里，几乎都能看到同一个根因：Service A 给 B 设了 3s 超时 + 3 次重试，B 给 C 设了 5s 超时 + 2 次重试——B 的超时比 A 的还长，A 早就放弃并重试了，但 B 还在傻等 C，同时 A 的每次重试又让 B 再发两次请求给 C，一个慢查询瞬间变...
+# CascadeGuard
+
+Static analyzer for microservice retry/timeout topologies. Catches cascading failure anti-patterns **before** they cause a 3 AM pager storm.
+
+## Detected Anti-Patterns
+
+| Rule | Severity | Description |
+|------|----------|-------------|
+| `timeout-inversion` | error | Downstream timeout > upstream timeout |
+| `retry-amplification` | error | Multiplicative retry factor >10x along a path |
+| `retry-without-cb` | warning | Retries configured without circuit breaker |
+| `non-idempotent-retry` | error | Retrying POST/PATCH/DELETE requests |
+| `backoff-no-jitter` | warning | Retries without jitter (thundering herd) |
+
+## Install
+
+```bash
+go install github.com/cascadeguard/cascadeguard@latest
+```
+
+Or build from source:
+
+```bash
+git clone https://github.com/cascadeguard/cascadeguard && cd cascadeguard
+go build -o cascadeguard .
+```
+
+## Usage
+
+Create `topology.yaml`:
+
+```yaml
+services:
+  gateway:
+    calls:
+      - target: user-svc
+        timeout: 3s
+        retries: 3
+        circuit_breaker: false
+        method: GET
+  user-svc:
+    calls:
+      - target: db-svc
+        timeout: 5s
+        retries: 2
+        circuit_breaker: false
+        method: POST
+```
+
+Run analysis:
+
+```bash
+cascadeguard topology.yaml
+```
+
+Exit code `0` = clean, `1` = findings detected, `2` = input error.
+
+## CI Integration
+
+```yaml
+- run: go install github.com/cascadeguard/cascadeguard@latest
+- run: cascadeguard topology.yaml
+```
+
+## License
+
+MIT
